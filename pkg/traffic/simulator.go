@@ -12,9 +12,9 @@ import (
 
 	"net/url"
 
-	"github.com/fid-dev/check-graceful-shutdown/pkg/cli/check-graceful-shutdown/cmd"
-	"github.com/fid-dev/check-graceful-shutdown/pkg/http/transport"
-	"github.com/fid-dev/check-graceful-shutdown/pkg/version"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/cli/check-graceful-shutdown/cmd/options"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/http/transport"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/version"
 	"github.com/pkg/errors"
 )
 
@@ -23,37 +23,42 @@ type Simulator interface {
 	Simulate(ctx context.Context, group *sync.WaitGroup)
 }
 
-func NewSimulatorForConfig(cfg cmd.TrafficConfig) (*simulator, error) {
-	return NewSimulator(cfg.Target.String(), "GET", cfg.RequestConcurrency, cfg.RequestTimeout)
-}
-
-func NewSimulator(target string, method string, concurrency int, timeout time.Duration) (*simulator, error) {
+func NewSimulatorForConfig(cfg options.TrafficConfig, projectName string) (*simulator, error) {
 	client := &http.Client{
 		Transport: &transport.UserAgent{
 			Transport: http.DefaultTransport,
-			UserAgent: fmt.Sprintf("%s/%s traffic-simulator", cmd.Name, version.Version),
+			UserAgent: fmt.Sprintf("%s/%s traffic-simulator", projectName, version.Version),
 		},
-		Timeout: timeout,
+		Timeout: cfg.RequestTimeout,
 	}
 
-	u, err := url.Parse(target)
+	u, err := url.Parse(cfg.Target.String())
 	if err != nil {
-		return nil, errors.Wrapf(err, "unable to parse url %s", target)
+		return nil, errors.Wrapf(err, "unable to parse url %s", cfg.Target.String())
 	}
+
+	return NewSimulator(client, u, "GET", cfg.RequestConcurrency, cfg.BodyReadDelay)
+}
+
+func NewSimulator(client *http.Client, target *url.URL, method string, concurrency int, bodyReadDelay time.Duration) (*simulator, error) {
 
 	return &simulator{
 		concurrentRequests: concurrency,
-		target:             u,
+		target:             target,
 		method:             method,
 		client:             client,
+		bodyReadDelay:      bodyReadDelay,
+		report:             NewSimulationReport(),
 	}, nil
 }
 
 type simulator struct {
 	concurrentRequests int
+	bodyReadDelay      time.Duration
 	target             *url.URL
 	method             string
 	client             *http.Client
+	report             *SimulationReport
 }
 
 func (s *simulator) Test(ctx context.Context) error {
@@ -61,7 +66,7 @@ func (s *simulator) Test(ctx context.Context) error {
 }
 
 func (s *simulator) Report() *SimulationReport {
-	return &SimulationReport{}
+	return s.report
 }
 
 func (s *simulator) Simulate(ctx context.Context, group *sync.WaitGroup) {
@@ -69,7 +74,7 @@ func (s *simulator) Simulate(ctx context.Context, group *sync.WaitGroup) {
 
 	log.Printf("Start traffic simulation to %s with concurrency of %d.", s.target.String(), s.concurrentRequests)
 
-	for n := 0; n <= s.concurrentRequests; n++ {
+	for n := 0; n < s.concurrentRequests; n++ {
 		go func() {
 			s.runSingle(ctx)
 			group.Done()
@@ -84,33 +89,29 @@ loop:
 		case <-ctx.Done():
 			break loop
 		default:
-			if err := s.performRequest(); err != nil {
-				// TODO handle error
-				log.Printf("request failed with: %s", err)
-			}
+			statusCode, dur, err := s.performRequest()
+			s.report.Record(statusCode, dur, err)
 		}
 	}
 }
 
-func (s *simulator) performRequest() error {
-	req, err := http.NewRequest(s.method, s.target.Path, nil)
+func (s *simulator) performRequest() (statusCode int, dur time.Duration, err error) {
+	start := time.Now()
+	req, err := http.NewRequest(s.method, s.target.String(), nil)
 	if err != nil {
-		return err
+		return
 	}
 
 	req.RemoteAddr = s.target.Host
 	res, err := s.client.Do(req)
 	if err != nil {
-		return err
+		return
 	}
 
-	if _, err := ioutil.ReadAll(res.Body); err != nil {
-		return errors.Wrap(err, "failed to read body")
+	<-time.After(s.bodyReadDelay)
+	if _, err = ioutil.ReadAll(res.Body); err != nil {
+		err = errors.Wrap(err, "failed to read body")
 	}
 
-	if res.StatusCode < http.StatusOK || res.StatusCode >= http.StatusBadRequest {
-		return errors.Errorf("unexpected status code: %d", res.StatusCode)
-	}
-
-	return nil
+	return res.StatusCode, time.Now().Sub(start), err
 }

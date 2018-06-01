@@ -13,13 +13,13 @@ import (
 
 	"net/url"
 
-	"github.com/fid-dev/check-graceful-shutdown/pkg/cli/check-graceful-shutdown/cmd/options"
-	"github.com/fid-dev/check-graceful-shutdown/pkg/http/transport"
-	"github.com/fid-dev/check-graceful-shutdown/pkg/version"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/cli/check-graceful-shutdown/cmd/options"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/http/transport"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/version"
 	"github.com/pkg/errors"
 )
 
-func NewHTTPForConfig(cfg options.ProbeConfig, projectName string) (*httpProbe, error) {
+func NewHTTPForConfig(cfg options.ProbeConfig, projectName string, initialStatus Status) (*httpProbe, error) {
 
 	client := &http.Client{
 		Timeout: cfg.RequestTimeout,
@@ -41,10 +41,11 @@ func NewHTTPForConfig(cfg options.ProbeConfig, projectName string) (*httpProbe, 
 		cfg.Period,
 		cfg.SuccessThreshold,
 		cfg.FailureThreshold,
+		initialStatus,
 	)
 }
 
-func NewHTTP(client *http.Client, target *url.URL, initialDelay, period time.Duration, successThreshold, failureThreshold int) (*httpProbe, error) {
+func NewHTTP(client *http.Client, target *url.URL, initialDelay, period time.Duration, successThreshold, failureThreshold int, initialStatus Status) (*httpProbe, error) {
 
 	return &httpProbe{
 		initialDelay:     initialDelay,
@@ -53,6 +54,7 @@ func NewHTTP(client *http.Client, target *url.URL, initialDelay, period time.Dur
 		failureThreshold: failureThreshold,
 		target:           target,
 		client:           client,
+		status:           initialStatus,
 		bucket:           make([]Status, 10),
 		subscribers:      make([]chan Status, 0),
 	}, nil
@@ -102,7 +104,7 @@ func (h *httpProbe) Notify(sCh chan Status) {
 }
 
 func (h *httpProbe) check() {
-	req, err := http.NewRequest("GET", h.target.Path, nil)
+	req, err := http.NewRequest("GET", h.target.String(), nil)
 	if err != nil {
 		h.pushStatus(Failure, errors.Wrap(err, "failed to build request"))
 		return
@@ -139,6 +141,11 @@ func (h *httpProbe) pushStatus(status Status, err error) {
 	h.bucket = bucket
 
 	log.Printf("Bucket: %+v", h.bucket)
+
+	if err != nil {
+		log.Println(err.Error())
+	}
+
 	h.evalStatus()
 }
 

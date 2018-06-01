@@ -11,8 +11,8 @@ import (
 
 	"log"
 
-	"github.com/fid-dev/check-graceful-shutdown/pkg/cli/check-graceful-shutdown/cmd/options"
-	"github.com/fid-dev/check-graceful-shutdown/pkg/grace"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/cli/check-graceful-shutdown/cmd/options"
+	"github.com/mrcrgl/check-graceful-shutdown/pkg/grace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -68,6 +68,11 @@ func NewRootCommand() *cobra.Command {
 
 	addProbeFlags(root.Flags(), "liveness", &cfg.LivenessProbe)
 	addProbeFlags(root.Flags(), "readiness", &cfg.ReadinessProbe)
+
+	var args []string
+	args, cfg.Process = options.CutProcessConfigFromArgs(os.Args...)
+
+	root.ParseFlags(args)
 
 	return root
 }
