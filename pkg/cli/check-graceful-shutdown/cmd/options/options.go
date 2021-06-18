@@ -5,10 +5,10 @@ import (
 	"time"
 )
 
+const ProjectName = "check-graceful-shutdown"
+
 func NewConfigWithDefaults() *Config {
 	cfg := new(Config)
-
-	cfg.ProjectName = "check-graceful-shutdown"
 
 	cfg.Traffic.Target.Val = url.URL{Path: "/", Host: ":8080", Scheme: "http"}
 	cfg.Traffic.RequestConcurrency = 2
@@ -41,6 +41,7 @@ type Config struct {
 }
 
 type ProcessConfig struct {
+	PID       int
 	Command   string
 	Arguments []string
 }

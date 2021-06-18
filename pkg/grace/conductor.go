@@ -15,17 +15,17 @@ import (
 )
 
 func NewConductor(cfg *options.Config) (*Conductor, error) {
-	liveness, err := probe.NewHTTPForConfig(cfg.LivenessProbe, cfg.ProjectName, probe.Success)
+	liveness, err := probe.NewHTTPForConfig(cfg.LivenessProbe, probe.Success)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create liveness probe")
 	}
 
-	readiness, err := probe.NewHTTPForConfig(cfg.ReadinessProbe, cfg.ProjectName, probe.Failure)
+	readiness, err := probe.NewHTTPForConfig(cfg.ReadinessProbe, probe.Failure)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create readiness probe")
 	}
 
-	simulator, err := traffic.NewSimulatorForConfig(cfg.Traffic, cfg.ProjectName)
+	simulator, err := traffic.NewSimulatorForConfig(cfg.Traffic)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to create traffic simulator")
 	}

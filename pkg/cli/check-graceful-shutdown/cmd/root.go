@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 
 	"os"
@@ -25,6 +26,10 @@ func NewRootCommand() *cobra.Command {
 		Short: "tool to check if a service supports graceful shutdown",
 		Long:  ``,
 		Run: func(cmd *cobra.Command, args []string) {
+			if cfg.Process.Command == "" {
+				fail(errors.New("invalid command to execute"))
+			}
+
 			c, err := grace.NewConductor(cfg)
 			if err != nil {
 				fail(err)
@@ -62,6 +67,8 @@ func NewRootCommand() *cobra.Command {
 		},
 	}
 
+	//root.Flags().IntVarP(&cfg.Process.PID, "pid", "p", 0, "pid of the process")
+	//root.Flags().StringVar(&cfg.Process.Command, "exec", cfg.Process.Command, "command to execute")
 	root.Flags().Var(&cfg.Traffic.Target, "traffic-target", "http endpoint to simulate traffic to")
 	root.Flags().IntVar(&cfg.Traffic.RequestConcurrency, "traffic-request-concurrency", cfg.Traffic.RequestConcurrency, "number of concurrent requests to perform")
 	root.Flags().DurationVar(&cfg.Traffic.RequestTimeout, "traffic-request-timeout", cfg.Traffic.RequestTimeout, "http request timeout")

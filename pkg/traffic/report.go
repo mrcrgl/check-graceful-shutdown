@@ -48,6 +48,12 @@ func (sr *SimulationReport) String() string {
 
 	fmt.Fprintf(buf, "num errors: %d", len(sr.errors))
 
+	if len(sr.errors) == 0 {
+		fmt.Fprint(buf, "GRACEFUL SHUTDOWN SUCCEED\n")
+	} else {
+		fmt.Fprintf(buf, "GRACEFUL SHUTDOWN FAILED WITH %d ERRORS!\n", len(sr.errors))
+	}
+
 	return buf.String()
 }
 

@@ -23,11 +23,11 @@ type Simulator interface {
 	Simulate(ctx context.Context, group *sync.WaitGroup)
 }
 
-func NewSimulatorForConfig(cfg options.TrafficConfig, projectName string) (*simulator, error) {
+func NewSimulatorForConfig(cfg options.TrafficConfig) (*simulator, error) {
 	client := &http.Client{
 		Transport: &transport.UserAgent{
 			Transport: http.DefaultTransport,
-			UserAgent: fmt.Sprintf("%s/%s traffic-simulator", projectName, version.Version),
+			UserAgent: fmt.Sprintf("%s/%s traffic-simulator", options.ProjectName, version.GetInfo()),
 		},
 		Timeout: cfg.RequestTimeout,
 	}
@@ -80,6 +80,9 @@ func (s *simulator) Simulate(ctx context.Context, group *sync.WaitGroup) {
 			group.Done()
 		}()
 	}
+
+	group.Wait()
+	log.Printf("Simulation closed")
 }
 
 func (s *simulator) runSingle(ctx context.Context) {

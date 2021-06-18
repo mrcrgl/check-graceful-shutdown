@@ -19,13 +19,13 @@ import (
 	"github.com/pkg/errors"
 )
 
-func NewHTTPForConfig(cfg options.ProbeConfig, projectName string, initialStatus Status) (*httpProbe, error) {
+func NewHTTPForConfig(cfg options.ProbeConfig, initialStatus Status) (*httpProbe, error) {
 
 	client := &http.Client{
 		Timeout: cfg.RequestTimeout,
 		Transport: &transport.UserAgent{
 			Transport: http.DefaultTransport,
-			UserAgent: fmt.Sprintf("%s/%s http-probe", projectName, version.Version),
+			UserAgent: fmt.Sprintf("%s/%s http-probe", options.ProjectName, version.GetInfo()),
 		},
 	}
 
@@ -140,7 +140,7 @@ func (h *httpProbe) pushStatus(status Status, err error) {
 	bucket = append(bucket, h.bucket[0:9]...)
 	h.bucket = bucket
 
-	log.Printf("Bucket: %+v", h.bucket)
+	//log.Printf("Bucket: %+v", h.bucket)
 
 	if err != nil {
 		log.Println(err.Error())
